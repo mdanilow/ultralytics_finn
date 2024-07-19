@@ -82,6 +82,14 @@ from .transformer import (
     TransformerEncoderLayer,
     TransformerLayer,
 )
+from .brevitas_blocks import (
+    QuantConv,
+    QuantC2f,
+    QuantBottleneck,
+    QuantSPPF,
+    QuantDetect,
+    DummyDetect,
+)
 
 __all__ = (
     "Conv",
