@@ -3,9 +3,11 @@
 import contextlib
 from copy import deepcopy
 from pathlib import Path
+from os.path import join
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 from ultralytics.nn.modules import (
     AIFI,
@@ -107,7 +109,7 @@ class BaseModel(nn.Module):
             return self.loss(x, *args, **kwargs)
         return self.predict(x, *args, **kwargs)
 
-    def predict(self, x, profile=False, visualize=False, augment=False, embed=None):
+    def predict(self, x, profile=False, visualize=False, augment=False, embed=None, save_features=False):
         """
         Perform a forward pass through the network.
 
@@ -123,9 +125,9 @@ class BaseModel(nn.Module):
         """
         if augment:
             return self._predict_augment(x)
-        return self._predict_once(x, profile, visualize, embed)
+        return self._predict_once(x, profile, visualize, embed, save_features)
 
-    def _predict_once(self, x, profile=False, visualize=False, embed=None):
+    def _predict_once(self, x, profile=False, visualize=False, embed=None, save_features=False):
         """
         Perform a forward pass through the network.
 
@@ -138,7 +140,8 @@ class BaseModel(nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        y, dt, embeddings = [], [], []  # outputs
+        y, dt, embeddings, features = [], [], [], []  # outputs
+        save_features = save_features and "features_to_save" in self.yaml
         for m in self.model:
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
@@ -148,10 +151,15 @@ class BaseModel(nn.Module):
             y.append(x if m.i in self.save else None)  # save output
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
+            if save_features:
+                if m.i in self.yaml["features_to_save"]:
+                    features.append(x)
             if embed and m.i in embed:
                 embeddings.append(nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))  # flatten
                 if m.i == max(embed):
                     return torch.unbind(torch.cat(embeddings, 1), dim=0)
+        if save_features:
+            x = (x, features)
         return x
 
     def _predict_augment(self, x):
@@ -888,7 +896,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
 
     # Args
     max_channels = float("inf")
-    nc, act, scales = (d.get(x) for x in ("nc", "activation", "scales"))
+    nc, act, scales, features_to_save = (d.get(x) for x in ("nc", "activation", "scales", "features_to_save"))
     depth, width, kpt_shape = (d.get(x, 1.0) for x in ("depth_multiple", "width_multiple", "kpt_shape"))
     if scales:
         scale = d.get("scale")
