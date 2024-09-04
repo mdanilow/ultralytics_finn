@@ -47,4 +47,13 @@ head:
   - [[15, 18, 21], 1, QuantDetect, [nc, 8, 8]] # Detect(P3, P4, P5)
   # - [-1, 1, DummyDetect, []]
 
+common_activations:
+  "bitwidth": 4
+  4: "A"
+  6: "B"
+  9: "B"
+  12: "A"
+  16: "A"
+  19: "B"
+
 # in every QuantC2f: cv1 act same as cv2 act in efery QuantBottleneck

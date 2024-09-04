@@ -9,6 +9,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+from brevitas.nn import QuantReLU
+from brevitas_examples.imagenet_classification.models.common import CommonUintActQuant
+
 from ultralytics.nn.modules import (
     AIFI,
     C1,
@@ -898,6 +901,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
     max_channels = float("inf")
     nc, act, scales, features_to_save = (d.get(x) for x in ("nc", "activation", "scales", "features_to_save"))
     depth, width, kpt_shape = (d.get(x, 1.0) for x in ("depth_multiple", "width_multiple", "kpt_shape"))
+    common_activations = d.get("common_activations")
     if scales:
         scale = d.get("scale")
         if not scale:
@@ -909,6 +913,17 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
         Conv.default_act = eval(act)  # redefine default activation, i.e. Conv.default_act = nn.SiLU()
         if verbose:
             LOGGER.info(f"{colorstr('activation:')} {act}")  # print
+
+    if common_activations:
+        activations_lookup = {}
+        act_names = list(set(common_activations.values()))
+        for act_name in act_names:
+            if isinstance(act_name, str):
+                activations_lookup[act_name] = QuantReLU(
+                                                    act_quant=CommonUintActQuant,
+                                                    bit_width=common_activations["bitwidth"],
+                                                    scaling_per_channel=False,
+                                                    return_quant_tensor=False)
 
     if verbose:
         LOGGER.info(f"\n{'':>3}{'from':>20}{'n':>3}{'params':>10}  {'module':<45}{'arguments':<30}")
@@ -1000,7 +1015,10 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
         else:
             c2 = ch[f]
 
-        m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)  # module
+        kwargs = {}
+        if common_activations and i in common_activations:
+            kwargs["act"] = activations_lookup[common_activations[i]]
+        m_ = nn.Sequential(*(m(*args, **kwargs) for _ in range(n))) if n > 1 else m(*args, **kwargs)  # module
         t = str(m)[8:-2].replace("__main__.", "")  # module type
         m.np = sum(x.numel() for x in m_.parameters())  # number params
         m_.i, m_.f, m_.type = i, f, t  # attach index, 'from' index, type

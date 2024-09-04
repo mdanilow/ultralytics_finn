@@ -67,7 +67,7 @@ class QuantConv(nn.Module):
 class QuantC2f(nn.Module):
     """Faster Implementation of CSP Bottleneck with 2 convolutions."""
 
-    def __init__(self, c1, c2, n=1, shortcut=False, weight_bit_width=8, act_bit_width=8, g=1, e=0.5):
+    def __init__(self, c1, c2, n=1, shortcut=False, weight_bit_width=8, act_bit_width=8, act=True, g=1, e=0.5):
         """Initialize CSP bottleneck layer with two convolutions with arguments ch_in, ch_out, number, shortcut, groups,
         expansion.
         """
@@ -79,7 +79,7 @@ class QuantC2f(nn.Module):
                                     return_quant_tensor=False)
         self.c = int(c2 * e)  # hidden channels
         self.cv1 = QuantConv(c1, 2 * self.c, 1, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, act=self.common_act)
-        self.cv2 = QuantConv((2 + n) * self.c, c2, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width)  # optional act=FReLU(c2)
+        self.cv2 = QuantConv((2 + n) * self.c, c2, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, act=act)  # optional act=FReLU(c2)
         self.m = nn.ModuleList(QuantBottleneck(self.c, self.c, shortcut=shortcut, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, cv2_act=self.common_act, g=g, k=(3, 3), e=1.0) for _ in range(n))
 
     def forward(self, x):
@@ -116,7 +116,7 @@ class QuantBottleneck(nn.Module):
 class QuantSPPF(nn.Module):
     """Spatial Pyramid Pooling - Fast (SPPF) layer for YOLOv5 by Glenn Jocher."""
 
-    def __init__(self, c1, c2, k=5, weight_bit_width=8, act_bit_width=8):
+    def __init__(self, c1, c2, k=5, weight_bit_width=8, act_bit_width=8, act=True):
         """
         Initializes the SPPF layer with given input/output channels and kernel size.
 
@@ -125,7 +125,7 @@ class QuantSPPF(nn.Module):
         super().__init__()
         c_ = c1 // 2  # hidden channels
         self.cv1 = QuantConv(c1, c_, 1, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width)
-        self.cv2 = QuantConv(c_ * 4, c2, 1, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width)
+        self.cv2 = QuantConv(c_ * 4, c2, 1, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, act=act)
         self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
 
     def forward(self, x):
