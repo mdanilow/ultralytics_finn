@@ -35,10 +35,10 @@ class QuantConv(nn.Module):
             stride=1,
             weight_bit_width=8,
             act_bit_width=8,
+            act=True,
             padding=None,
             groups=1,
-            dilation=1,
-            act=True):
+            dilation=1):
         super(QuantConv, self).__init__()
         self.conv = QuantConv2d(
             in_channels=in_channels,
@@ -51,12 +51,12 @@ class QuantConv(nn.Module):
             weight_quant=CommonIntWeightPerChannelQuant,
             weight_bit_width=weight_bit_width)
         self.bn = nn.BatchNorm2d(num_features=out_channels, eps=1e-5)
-        self.act = QuantReLU(
-                        act_quant=CommonUintActQuant,
-                        bit_width=act_bit_width,
-                        per_channel_broadcastable_shape=(1, out_channels, 1, 1),
-                        scaling_per_channel=True,
-                        return_quant_tensor=False)
+        self.act = act if isinstance(act, nn.Module) else QuantReLU(
+                                                                    act_quant=CommonUintActQuant,
+                                                                    bit_width=act_bit_width,
+                                                                    per_channel_broadcastable_shape=(1, out_channels, 1, 1),
+                                                                    scaling_per_channel=True,
+                                                                    return_quant_tensor=False)
 
     def forward(self, x):
         return self.act(self.bn(self.conv(x)))
@@ -72,10 +72,15 @@ class QuantC2f(nn.Module):
         expansion.
         """
         super().__init__()
+        self.common_act = QuantReLU(
+                                    act_quant=CommonUintActQuant,
+                                    bit_width=act_bit_width,
+                                    scaling_per_channel=False,
+                                    return_quant_tensor=False)
         self.c = int(c2 * e)  # hidden channels
-        self.cv1 = QuantConv(c1, 2 * self.c, 1, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width)
+        self.cv1 = QuantConv(c1, 2 * self.c, 1, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, act=self.common_act)
         self.cv2 = QuantConv((2 + n) * self.c, c2, 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width)  # optional act=FReLU(c2)
-        self.m = nn.ModuleList(QuantBottleneck(self.c, self.c, shortcut=shortcut, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, g=g, k=(3, 3), e=1.0) for _ in range(n))
+        self.m = nn.ModuleList(QuantBottleneck(self.c, self.c, shortcut=shortcut, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, cv2_act=self.common_act, g=g, k=(3, 3), e=1.0) for _ in range(n))
 
     def forward(self, x):
         """Forward pass through C2f layer."""
@@ -93,14 +98,14 @@ class QuantC2f(nn.Module):
 class QuantBottleneck(nn.Module):
     """Standard bottleneck."""
 
-    def __init__(self, c1, c2, shortcut=True, weight_bit_width=8, act_bit_width=8, g=1, k=(3, 3), e=0.5):
+    def __init__(self, c1, c2, shortcut=True, weight_bit_width=8, act_bit_width=8, cv2_act=True, g=1, k=(3, 3), e=0.5):
         """Initializes a bottleneck module with given input/output channels, shortcut option, group, kernels, and
         expansion.
         """
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = QuantConv(c1, c_, k[0], 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width)
-        self.cv2 = QuantConv(c_, c2, k[1], 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, groups=g)
+        self.cv2 = QuantConv(c_, c2, k[1], 1, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width, act=cv2_act, groups=g)
         self.add = shortcut and c1 == c2
 
     def forward(self, x):
