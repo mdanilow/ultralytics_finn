@@ -293,6 +293,7 @@ class Model(nn.Module):
         """
         self._check_is_pytorch_model()
         if isinstance(weights, (str, Path)):
+            self.ckpt_path = weights
             weights, self.ckpt = attempt_load_one_weight(weights)
         self.model.load(weights)
         return self

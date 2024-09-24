@@ -99,6 +99,7 @@ class BaseTrainer:
         """
         self.args = get_cfg(cfg, overrides)
         self.check_resume(overrides)
+        # self.resume = self.args.resume
         self.device = select_device(self.args.device, self.args.batch)
         self.validator = None
         self.metrics = None
@@ -487,7 +488,8 @@ class BaseTrainer:
                 "epoch": self.epoch,
                 "best_fitness": self.best_fitness,
                 "model": None,  # resume and final checkpoints derive from EMA
-                "ema": deepcopy(self.ema.ema).half(),
+                # "ema": deepcopy(self.ema.ema).half(),
+                "ema": self.ema.ema.state_dict(),
                 "updates": self.ema.updates,
                 "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
                 "train_args": vars(self.args),  # save as dict
