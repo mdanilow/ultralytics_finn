@@ -99,7 +99,6 @@ class BaseTrainer:
         """
         self.args = get_cfg(cfg, overrides)
         self.check_resume(overrides)
-        # self.resume = self.args.resume
         self.device = select_device(self.args.device, self.args.batch)
         self.validator = None
         self.metrics = None
@@ -659,7 +658,9 @@ class BaseTrainer:
                 last = Path(check_file(resume) if exists else get_latest_run())
 
                 # Check that resume data YAML exists, otherwise strip to force re-download of dataset
-                ckpt_args = attempt_load_weights(last).args
+                ckpt = torch.load(last)
+                ckpt_args = ckpt["train_args"]
+                # ckpt_args = attempt_load_weights(last).args
                 if not Path(ckpt_args["data"]).exists():
                     ckpt_args["data"] = self.args.data
 
