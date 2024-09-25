@@ -489,6 +489,7 @@ class BaseTrainer:
                 "model": None,  # resume and final checkpoints derive from EMA
                 # "ema": deepcopy(self.ema.ema).half(),
                 "ema": self.ema.ema.state_dict(),
+                "cfg": self.ema.ema.yaml,
                 "updates": self.ema.updates,
                 "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
                 "train_args": vars(self.args),  # save as dict
@@ -542,7 +543,10 @@ class BaseTrainer:
         ckpt = None
         if str(self.model).endswith(".pt"):
             weights, ckpt = attempt_load_one_weight(self.model)
-            cfg = weights.yaml
+            if isinstance(weights, dict):
+                cfg = weights["cfg"]
+            else:
+                cfg = weights.yaml
         elif isinstance(self.args.pretrained, (str, Path)):
             weights, _ = attempt_load_one_weight(self.args.pretrained)
         self.model = self.get_model(cfg=cfg, weights=weights, verbose=RANK == -1)  # calls Model(cfg, weights)
@@ -688,7 +692,8 @@ class BaseTrainer:
             self.optimizer.load_state_dict(ckpt["optimizer"])  # optimizer
             best_fitness = ckpt["best_fitness"]
         if self.ema and ckpt.get("ema"):
-            self.ema.ema.load_state_dict(ckpt["ema"].float().state_dict())  # EMA
+            ema = ckpt["ema"]
+            self.ema.ema.load_state_dict(ema if isinstance(ema, dict) else ema.float().state_dict())  # EMA
             self.ema.updates = ckpt["updates"]
         assert start_epoch > 0, (
             f"{self.args.model} training to {self.epochs} epochs is finished, nothing to resume.\n"
