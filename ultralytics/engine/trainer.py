@@ -437,6 +437,9 @@ class BaseTrainer:
                     self.save_model()
                     self.run_callbacks("on_model_save")
 
+                if self.args.plots:
+                    self.plot_metrics()
+
             # Scheduler
             t = time.time()
             self.epoch_time = t - self.epoch_time_start
