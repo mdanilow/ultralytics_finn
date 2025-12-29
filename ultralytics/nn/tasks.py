@@ -296,7 +296,10 @@ class BaseModel(torch.nn.Module):
             verbose (bool, optional): Whether to log the transfer progress.
         """
         model = weights["model"] if isinstance(weights, dict) else weights  # torchvision models are not dicts
-        csd = model.float().state_dict()  # checkpoint state_dict as FP32
+        if isinstance(model, dict):
+            csd = model
+        else:
+            csd = model.float().state_dict()  # checkpoint state_dict as FP32
         updated_csd = intersect_dicts(csd, self.state_dict())  # intersect
         self.load_state_dict(updated_csd, strict=False)  # load
         len_updated_csd = len(updated_csd)
