@@ -7,6 +7,8 @@ from torch.nn import Sequential
 
 from brevitas.nn import QuantConv2d, QuantLinear, QuantReLU, QuantIdentity
 from brevitas.quant import IntBias
+import brevitas.config as config
+config._FULL_STATE_DICT = True
 
 from brevitas_examples.imagenet_classification.models.common import CommonIntActQuant, CommonUintActQuant
 from brevitas_examples.imagenet_classification.models.common import CommonIntWeightPerChannelQuant
