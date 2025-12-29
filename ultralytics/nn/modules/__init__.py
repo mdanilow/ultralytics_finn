@@ -101,6 +101,14 @@ from .transformer import (
     TransformerEncoderLayer,
     TransformerLayer,
 )
+from .brevitas_blocks import (
+    QuantConv,
+    QuantC2f,
+    QuantBottleneck,
+    QuantSPPF,
+    QuantDetect,
+)
+
 
 __all__ = (
     "AIFI",
