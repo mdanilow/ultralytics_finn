@@ -175,8 +175,22 @@ class BaseTrainer:
         self.tloss = None
         self.loss_names = ["Loss"]
         self.csv = self.save_dir / "results.csv"
-        if self.csv.exists() and not self.args.resume:
-            self.csv.unlink()
+        if not self.args.resume:
+            if self.csv.exists():
+                self.csv.unlink()
+            elif args_dict["model"].endswith(".pt"):
+                # copy existing training results
+                _, ckpt = load_checkpoint(args_dict["model"])
+                if ckpt.get("train_results") is not None:
+                    results = ckpt["train_results"]
+                    values = list(results.values())
+                    n = len(values)
+                    with open(self.csv, "w", encoding="utf-8") as f:
+                        print(len(results), len(results.keys()))
+                        f.write(("%s," * len(results) % tuple(results.keys())).rstrip(",") + "\n")
+                        for i in range(len(values[0])):
+                            i_vals = [x[i] for x in values]
+                            f.write(("%.6g," * n % tuple(i_vals)).rstrip(",") + "\n")
         self.plot_idx = [0, 1, 2]
         self.nan_recovery_attempts = 0
 
