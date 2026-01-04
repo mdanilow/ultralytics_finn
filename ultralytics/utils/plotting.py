@@ -891,7 +891,7 @@ def plot_results(file: str = "path/to/results.csv", dir: str = "", on_plot: Call
                 )
                 fig, ax = plt.subplots(3, len(columns) // 2, figsize=(len(columns) + 2, 6), tight_layout=True)
                 ax = ax.ravel()
-            x = data.select(data.columns[0]).to_numpy().flatten()
+            x = list(range(data.shape[0]))
             for i, j in enumerate(columns + lr_keys):
                 y = data.select(j).to_numpy().flatten().astype("float")
                 ax[i].plot(x, y, marker=".", label=f.stem, linewidth=2, markersize=8)  # actual results
