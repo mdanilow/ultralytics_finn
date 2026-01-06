@@ -478,7 +478,6 @@ class BaseTrainer:
                         self.plot_training_samples(batch, ni)
 
                 self.run_callbacks("on_train_batch_end")
-                self.save_model()
 
             self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
 
@@ -609,8 +608,13 @@ class BaseTrainer:
             {
                 "epoch": self.epoch,
                 "best_fitness": self.best_fitness,
-                "model": None,  # resume and final checkpoints derive from EMA
-                # "ema": deepcopy(unwrap_model(self.ema.ema)).half(),
+                "model_meta": {
+                    "yaml": self.model.yaml,
+                    "nc": self.model.nc,
+                    "names": self.model.names,
+                },
+                "model_type": type(self.model),
+                "model": self.model.state_dict(),  # resume and final checkpoints derive from EMA
                 "ema": self.ema.ema.state_dict(),
                 "updates": self.ema.updates,
                 "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
@@ -868,7 +872,11 @@ class BaseTrainer:
             self.scaler.load_state_dict(ckpt["scaler"])
         if self.ema and ckpt.get("ema"):
             self.ema = ModelEMA(self.model)  # validation with EMA creates inference tensors that can't be updated
-            self.ema.ema.load_state_dict(ckpt["ema"].float().state_dict())
+            if isinstance(ckpt["ema"], dict):
+                state_dict = ckpt["ema"]
+            else:
+                state_dict = ckpt["ema"].float().state_dict()
+            self.ema.ema.load_state_dict(state_dict)
             self.ema.updates = ckpt["updates"]
         self.best_fitness = ckpt.get("best_fitness", 0.0)
 

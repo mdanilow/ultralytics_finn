@@ -69,7 +69,7 @@ from ultralytics.nn.modules import (
     YOLOESegment,
     v10Detect,
 )
-from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, YAML, colorstr, emojis
+from ultralytics.utils import RANK, DEFAULT_CFG_DICT, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils.loss import (
     E2EDetectLoss,
@@ -295,11 +295,11 @@ class BaseModel(torch.nn.Module):
             weights (dict | torch.nn.Module): The pre-trained weights to be loaded.
             verbose (bool, optional): Whether to log the transfer progress.
         """
-        model = weights["model"] if isinstance(weights, dict) else weights  # torchvision models are not dicts
-        if isinstance(model, dict):
-            csd = model
+        if isinstance(weights, dict):
+            csd = weights
         else:
-            csd = model.float().state_dict()  # checkpoint state_dict as FP32
+            # model = weights["model"] if isinstance(weights, dict) else weights  # torchvision models are not dicts
+            csd = weights.float().state_dict()  # checkpoint state_dict as FP32
         updated_csd = intersect_dicts(csd, self.state_dict())  # intersect
         self.load_state_dict(updated_csd, strict=False)  # load
         len_updated_csd = len(updated_csd)
@@ -1448,7 +1448,7 @@ def torch_safe_load(weight, safe_only=False):
     return ckpt, file
 
 
-def load_checkpoint(weight, device=None, inplace=True, fuse=False):
+def load_checkpoint(weight, device=None, inplace=True, fuse=False, load_ema=True, verbose=True):
     """Load a single model weights.
 
     Args:
@@ -1463,7 +1463,24 @@ def load_checkpoint(weight, device=None, inplace=True, fuse=False):
     """
     ckpt, weight = torch_safe_load(weight)  # load ckpt
     args = {**DEFAULT_CFG_DICT, **(ckpt.get("train_args", {}))}  # combine model and default args, preferring model args
-    model = (ckpt.get("ema") or ckpt["model"]).float()  # FP32 model
+    # model = (ckpt.get("ema") or ckpt["model"]).float()  # FP32 model
+    if load_ema and ckpt.get("ema") is not None:
+        model = ckpt.get("ema")
+    else:
+        model = ckpt.get("model")
+    
+    if isinstance(model, dict):
+    # state dict
+        state_dict = model
+        cfg = ckpt["model_meta"]["yaml"]
+        model = ckpt["model_type"](cfg, verbose=verbose and RANK == -1).float()
+        model.yaml = cfg
+        model.nc = ckpt["model_meta"]["nc"]
+        model.names = ckpt["model_meta"]["names"]
+        model.load(state_dict)
+    else:
+    # serialized model
+        model = model.float()
 
     # Model compatibility updates
     model.args = args  # attach args to model
