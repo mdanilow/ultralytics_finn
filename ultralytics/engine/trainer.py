@@ -609,13 +609,13 @@ class BaseTrainer:
                 "epoch": self.epoch,
                 "best_fitness": self.best_fitness,
                 "model_meta": {
-                    "yaml": self.model.yaml,
-                    "nc": self.model.nc,
-                    "names": self.model.names,
+                    "yaml": unwrap_model(self.model).yaml,
+                    "nc": unwrap_model(self.model).nc,
+                    "names": unwrap_model(self.model).names,
                 },
-                "model_type": type(self.model),
-                "model": self.model.state_dict(),  # resume and final checkpoints derive from EMA
-                "ema": self.ema.ema.state_dict(),
+                "model_type": type(unwrap_model(self.model)),
+                "model": unwrap_model(self.model).state_dict(),  # resume and final checkpoints derive from EMA
+                "ema": unwrap_model(self.ema.ema).state_dict(),
                 "updates": self.ema.updates,
                 "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
                 "scaler": self.scaler.state_dict(),
